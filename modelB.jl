@@ -47,8 +47,9 @@ function step(m², ϕ, x1, x2)
     end
 end
 
+transition(i,j,k) = [4(i-1)+2(j-1), j+k-2, k-1]
+
 function sweep(m², ϕ)
-    transition(i,j,k) = [4(i-1)+2(j-1), j+k-2, k-1]
     for n in 0:2, m in 1:4
         Threads.@threads for k in 1:L   
             for i in 1:L÷4, j in 1:L
