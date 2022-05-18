@@ -6,8 +6,8 @@ v = [0 0 0; 1 0 0; 0 1 0; 1 1 0]
 colors = [:black, :red, :green, :blue]
 
 function update(ϕ, x1, x2, m)
-    if x1[1]==8
-        plot!([x1[1], 9].+0.5, [x1[2], x2[2]].+0.5, lc=colors[m])
+    if x1[1]==L
+        plot!([x1[1], L+1].+0.5, [x1[2], x2[2]].+0.5, lc=colors[m])
         plot!([x2[1], 0].+0.5, [x1[2], x2[2]].+0.5, lc=colors[m])
     else
         plot!([x1[1], x2[1]].+0.5, [x1[2], x2[2]].+0.5, lc=colors[m])
@@ -38,8 +38,8 @@ result = sweep(ϕ)
 anim = @animate for n in 1:length(result)
     plot(result[n], legend=false)
     title!(latexstring("z=", (n-1)%L+1))
-    xaxis!("x", (1,9))
-    yaxis!("y", (1,9))
+    xaxis!("x", (1,L+1))
+    yaxis!("y", (1,L+1))
 end
 
 gif(anim, "sweeps.gif", fps=1.5)
