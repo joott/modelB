@@ -3,8 +3,9 @@ cd(@__DIR__)
 using Plots
 using LaTeXStrings
 using Distributions
+using Printf
 
-const L = 8 # must be a multiple of 4
+const L = 4 # must be a multiple of 4
 const λ = 4.0f0
 const Γ = 1.0f0
 const T = 1.0f0
@@ -73,13 +74,12 @@ m² = -2.285
 
 thermalize(m², ϕ, 100*L^2)
 
-maxt = L^2*500
+maxt = L^2*25
 
 open("output_$L.dat","w") do io 
 	for i in 0:maxt
 		Mt = M(ϕ)
-		@inbounds ϕk0 = fft(ϕ)[1,1,1] 
-		Printf.@printf(io, "%i %f %f %f\n", i, Mt, real(ϕk0), imag(ϕk0))
-		thermalize(m², ϕ, 100)
+		Printf.@printf(io, "%i %f\n", i, Mt)
+		thermalize(m², ϕ, 20)
 	end
 end
