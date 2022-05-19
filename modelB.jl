@@ -5,6 +5,7 @@ using Distributions
 using Printf
 using BenchmarkTools
 using StaticArrays
+using FFTW
 
 const L = 8 # must be a multiple of 4
 const λ = 4.0f0
@@ -55,7 +56,7 @@ function sweep(m², ϕ)
                 x1 = transition[idx]
                 x1[idx[1]] += m%2
                 x1[idx[2]] += m<3
-                x2 = x1
+                x2 = copy(x1)
                 x2[n+1] += 1
 
                 step(m², ϕ, x1.%L.+1, x2.%L.+1)
@@ -70,7 +71,11 @@ function thermalize(m², ϕ, N=10000)
     end
 end
 
-M(ϕ) = sum(ϕ)/L^3
+function op(ϕ, L)
+    ϕk = fft(ϕ)
+    average = ϕk[1,1,1]/L^3
+    (real(average), ϕk[:,1,1])
+end
 
 m² = -2.285
 
@@ -78,12 +83,16 @@ m² = -2.285
 
 thermalize(m², ϕ, 100*L^2)
 
-maxt = L^2*25
+maxt = L^2
 
 open("output_$L.dat","w") do io 
 	for i in 0:maxt
-		Mt = M(ϕ)
-		Printf.@printf(io, "%i %f\n", i, Mt)
+        (M, ϕk) = op(ϕ, L)
+		Printf.@printf(io, "%i %f", 20i, M)
+        for kx in 1:L
+            Printf.@printf(io, " %f %f", real(ϕk[kx]), imag(ϕk[kx]))
+        end
+        Printf.@printf(io, "\n")
 		thermalize(m², ϕ, 20)
 	end
 end
