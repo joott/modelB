@@ -5,6 +5,7 @@ using Distributions
 using Printf
 using BenchmarkTools
 using StaticArrays
+using FFTW
 
 const L = 8 # must be a multiple of 4
 const λ = 4.0f0
@@ -13,9 +14,11 @@ const T = 1.0f0
 
 const Δt = 0.04f0/Γ
 const Rate = Float32(sqrt(2.0*Δt*Γ))
+ξ = Normal(0.0f0, 1.0f0)
+
 
 function hotstart(n)
-    rand(Normal(), n, n, n)
+    rand(ξ, n, n, n)
 end
 
 function ΔH(x, ϕ, q, m²)
@@ -31,7 +34,7 @@ function ΔH(x, ϕ, q, m²)
 end
 
 function step(m², ϕ, x1, x2)
-    q = Rate*rand(Normal())
+    q = Rate*rand(ξ)
 
     @inbounds ϕ1 = ϕ[x1[1], x1[2], x1[3]]
     @inbounds ϕ2 = ϕ[x2[1], x2[2], x2[3]]
@@ -39,7 +42,8 @@ function step(m², ϕ, x1, x2)
     δH = ΔH(x1, ϕ, q, m²) + ΔH(x2, ϕ, -q, m²) + q^2
     P = min(1.0f0, exp(-δH))
     r = rand(Float32)
-    if (r < P)
+	
+	if (r < P)
         @inbounds ϕ[x1[1], x1[2], x1[3]] += q
         @inbounds ϕ[x2[1], x2[2], x2[3]] -= q
     end
@@ -55,7 +59,7 @@ function sweep(m², ϕ)
                 x1 = transition[idx]
                 x1[idx[1]] += m%2
                 x1[idx[2]] += m<3
-                x2 = x1
+				x2 = copy(x1)
                 x2[n+1] += 1
 
                 step(m², ϕ, x1.%L.+1, x2.%L.+1)
@@ -76,14 +80,26 @@ m² = -2.285
 
 ϕ = hotstart(L)
 
-thermalize(m², ϕ, 100*L^2)
+thermalize(m², ϕ, 100*L^4)
 
-maxt = L^2*25
+maxt = L^4*25
+
+skip=20 
+
+ϕk = fft(ϕ)
 
 open("output_$L.dat","w") do io 
 	for i in 0:maxt
 		Mt = M(ϕ)
-		Printf.@printf(io, "%i %f\n", i, Mt)
-		thermalize(m², ϕ, 20)
+
+		ϕk = fft(ϕ)
+
+		Printf.@printf(io, "%i %f", skip*i, Mt)
+		for kx in 1:L
+			Printf.@printf(io, " %f %f", real(ϕk[1,kx,1]), imag(ϕk[1,kx,1]))
+		end 
+
+		Printf.@printf(io,  "\n")
+		thermalize(m², ϕ, skip)
 	end
 end
