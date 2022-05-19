@@ -14,7 +14,6 @@ const T = 1.0f0
 const Δt = 0.04f0/Γ
 const Rate = Float32(sqrt(2.0*Δt*Γ))
 
-
 function hotstart(n)
     rand(Normal(), n, n, n)
 end
@@ -46,18 +45,19 @@ function step(m², ϕ, x1, x2)
     end
 end
 
-transition(i,j,k) = [4(i-1)+2(j-1), j+k-2, k-1]
-
 function sweep(m², ϕ)
     for n in 0:2, m in 1:4
         Threads.@threads for k in 1:L   
             for i in 1:L÷4, j in 1:L
                 idx = [(3-n)%3+1, (4-n)%3+1, (5-n)%3+1]
-                x1 = transition(i,j,k)[idx]
+                transition = [4(i-1)+2(j-1), j+k-2, k-1]
+
+                x1 = transition[idx]
                 x1[idx[1]] += m%2
-                x1[idx[2]] += m<2
+                x1[idx[2]] += m<3
                 x2 = x1
                 x2[n+1] += 1
+
                 step(m², ϕ, x1.%L.+1, x2.%L.+1)
             end
         end
