@@ -1,11 +1,12 @@
 cd(@__DIR__)
 
 using Plots
-using LaTeXStrings
 using Distributions
 using Printf
+using BenchmarkTools
+using StaticArrays
 
-const L = 4 # must be a multiple of 4
+const L = 8 # must be a multiple of 4
 const λ = 4.0f0
 const Γ = 1.0f0
 const T = 1.0f0
@@ -13,8 +14,6 @@ const T = 1.0f0
 const Δt = 0.04f0/Γ
 const Rate = Float32(sqrt(2.0*Δt*Γ))
 
-const v = [0 0 0; 1 0 0; 0 1 0; 1 1 0]
-const μ = [1 0 0; 0 1 0; 0 0 1]
 
 function hotstart(n)
     rand(Normal(), n, n, n)
@@ -54,8 +53,11 @@ function sweep(m², ϕ)
         Threads.@threads for k in 1:L   
             for i in 1:L÷4, j in 1:L
                 idx = [(3-n)%3+1, (4-n)%3+1, (5-n)%3+1]
-                x1 = transition(i,j,k)[idx] + v[m,idx]
-                x2 = x1 + μ[n+1,:]
+                x1 = transition(i,j,k)[idx]
+                x1[idx[1]] += m%2
+                x1[idx[2]] += m<2
+                x2 = x1
+                x2[n+1] += 1
                 step(m², ϕ, x1.%L.+1, x2.%L.+1)
             end
         end
@@ -70,8 +72,9 @@ end
 
 M(ϕ) = sum(ϕ)/L^3
 
-ϕ = hotstart(L)
 m² = -2.285
+
+ϕ = hotstart(L)
 
 thermalize(m², ϕ, 100*L^2)
 
