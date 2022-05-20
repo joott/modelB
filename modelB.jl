@@ -1,10 +1,7 @@
 cd(@__DIR__)
 
-using Plots
 using Distributions
 using Printf
-using BenchmarkTools
-using StaticArrays
 using FFTW
 
 const L = 8 # must be a multiple of 4
@@ -15,7 +12,6 @@ const T = 1.0f0
 const Δt = 0.04f0/Γ
 const Rate = Float32(sqrt(2.0*Δt*Γ))
 ξ = Normal(0.0f0, 1.0f0)
-
 
 function hotstart(n)
     rand(ξ, n, n, n)
@@ -51,14 +47,13 @@ end
 
 function sweep(m², ϕ)
     for n in 0:2, m in 1:4
-        Threads.@threads for k in 1:L   
+        Threads.@threads for k in 1:L
             for i in 1:L÷4, j in 1:L
-                idx = [(3-n)%3+1, (4-n)%3+1, (5-n)%3+1]
                 transition = [4(i-1)+2(j-1), j+k-2, k-1]
 
-                x1 = transition[idx]
-                x1[idx[1]] += m%2
-                x1[idx[2]] += m<3
+                x1 = transition[[(3-n)%3+1, (4-n)%3+1, (5-n)%3+1]]
+                x1[n+1] += m%2
+                x1[(n+1)%3+1] += m<3
 				x2 = copy(x1)
                 x2[n+1] += 1
 
@@ -82,15 +77,13 @@ end
 
 m² = -2.285
 
-ϕ = hotstart(L)
+ϕ = zeros(Float32, (L,L,L))
 
 thermalize(m², ϕ, 100*L^4)
 
-maxt = L^4*25
+maxt = L^4*50
 
 skip=20 
-
-ϕk = fft(ϕ)
 
 open("output_$L.dat","w") do io 
 	for i in 0:maxt
