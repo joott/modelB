@@ -1,8 +1,8 @@
-setenv JULIA_DEPOT_PATH /home/jkott/julia
 path=`pwd`
 
-for L in 8 ; do
+for i in {1..3} ; do
 
+ L = 8
  id=$RANDOM # not important -- just to provide a random seed for the start
 
  # create a tmp file for submission 
