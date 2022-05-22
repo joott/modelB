@@ -35,9 +35,6 @@ end
 function step(m², ϕ, x1, x2)
     q = Rate*rand(ξ)
 
-    @inbounds ϕ1 = ϕ[x1[1], x1[2], x1[3]]
-    @inbounds ϕ2 = ϕ[x2[1], x2[2], x2[3]]
-
     δH = ΔH(x1, ϕ, q, m²) + ΔH(x2, ϕ, -q, m²) + q^2
     P = min(1.0f0, exp(-δH))
     r = rand(Float64)
@@ -99,7 +96,7 @@ m² = -2.28587
 maxt = L^2
 
 for i in 1:maxt
-    thermalize(m², ϕ, 100^L^2)
+    thermalize(m², ϕ, 4*L^2)
     @show i
-    jldsave("/share/tmschaef/jkott/tmp/modelB/thermalize_L_"*string(L)*"_id_"*ARGS[1]*".jld2", true; ϕ=ϕ)
+    jldsave("/share/tmschaef/jkott/tmp/modelB/IC_L_"*string(L)*"_id_"*ARGS[1]*".jld2", true; ϕ=ϕ, m2=m²)
 end
