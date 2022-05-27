@@ -46,31 +46,18 @@ function step(m², ϕ, x1, x2)
 end
 
 function sweep(m², ϕ)
-    #=
-    n=0 : (i,j,k)->(x,y,z)
-    n=1 : (i,j,k)->(y,z,x)
-    n=2 : (i,j,k)->(z,x,y)
-    pairs are in i direction
-    =#
-    for n in 0:2, m in 1:4
-        Threads.@threads for k in 1:L
-            for i in 1:L÷4, j in 1:L
-                transition = [4(i-1)+2(j-1), j+k-2, k-1] # initial transition from indices to spatial coordinates with origin 0,0
+    for n in 0:7
+        Threads.@threads for m in 0:L^3÷16-1
+            i = 4m ÷ (L^2)
+            j = (m÷L) % (L÷4)
+            k = m%L
+            x1 = [4i+k+2(n÷4),4j+2k+(n%4),k]
 
-                # if a∈{1,2,3} chooses a direction in (x,y,z), idx[a] denotes the corresponding direction in (i,j,k)
-                #   ex) idx[2]=3 means k -> y
-                idx = [(3-n)%3+1, (4-n)%3+1, (5-n)%3+1] 
+            for μ in 0:5
+                x2 = copy(x1)
+                x2[μ%3+1] += 1+(L-2)*(μ÷3)
 
-                x1 = transition[idx] # get spatial coordinates in correct orientation according to n
-
-                # 4 values of m are for the 4 permutations of offset in the (i,j) directions
-                #                       m=1 2 3 4
-                x1[n+1] += m%2          # 1 0 1 0
-                x1[(n+1)%3+1] += m<3    # 1 1 0 0
-				x2 = copy(x1)
-                x2[n+1] += 1 # get +i neighbor
-
-                step(m², ϕ, x1.%L.+1, x2.%L.+1) # modulus to fit everything in lattice
+                step(m², ϕ, x1.%L.+1, x2.%L.+1)
             end
         end
     end
@@ -90,9 +77,10 @@ end
 
 m² = -2.285
 
-ϕ = zeros(Float32, (L,L,L))
+ϕ = hotstart(L)
+ϕ .= ϕ .- shuffle(ϕ)
 
-thermalize(m², ϕ, 100*L^4)
+thermalize(m², ϕ, 4*L^4)
 
 maxt = L^4*50
 
