@@ -87,7 +87,7 @@ for n in 1:3(L-1)^2
     length(B) != 0 && push!(C, B[1].+1)
 end
 
-indices = map(CartesianIndex(v...) for v in C)
+indices = map(v -> CartesianIndex(v...), C)
 
 df = load("/share/tmschaef/jkott/modelB/IC_L_$L"*"_id_"*ARGS[1]*".jld2")
 
