@@ -46,19 +46,21 @@ function step(m², ϕ, x1, x2, L, R, r_i)
 	@inbounds ϕ[x2...] -= q * (r<P)
 end
 
-function sweep(m², ϕ, R, kernel, threads, blocks)
+function sweep(m², ϕ, R, threads, blocks)
 	#=
 	n=0 : (i,j,k)->(x,y,z)
 	n=1 : (i,j,k)->(y,z,x)
 	n=2 : (i,j,k)->(z,x,y)
 	pairs are in i direction
 	=#
-	for n in 0:2, m in 1:4
-		kernel(m², ϕ, L, n, m, R; threads, blocks)
+	for m in 1:4
+		kernel_i(m², ϕ, L, m, R; threads, blocks)
+		kernel_j(m², ϕ, L, m, R; threads, blocks)
+		kernel_k(m², ϕ, L, m, R; threads, blocks)
 	end
 end
 
-function gpu_sweep(m², ϕ, L, n, m, R)
+function gpu_sweep_i(m², ϕ, L, m, R)
     index = (blockIdx().x - 1) * blockDim().x + threadIdx().x - 1
     stride = gridDim().x * blockDim().x
 
@@ -67,21 +69,55 @@ function gpu_sweep(m², ϕ, L, n, m, R)
         j = (l÷L) % L
         k = l%L
         
-        tmp = (4i + 2j + m%2, j + k + m÷2, k)
-		(x, y, z) = (tmp[n+1], tmp[(n+1)%3+1], tmp[(n+2)%3+1])
-		x1 = (x%L+1, y%L+1, z%L+1)
-        x2 = ((x + (n==0))%L+1, (y + (n==1))%L+1, (z + (n==2))%L+1)
+        x1 = ((4i + 2j + m%2)%L+1, (j + k + m÷2)%L+1, k%L+1)
+        @inbounds x2 = (x1[1]%L+1, x1[2], x1[3])
 
-		r_i = L^3÷4 * (n + 3(m-1)) + l + 1
+		r_i = L^3÷4 * 3(m-1) + l + 1
 		step(m², ϕ, x1, x2, L, R, r_i)
     end
     return
 end
 
-function thermalize(m², ϕ, kernel, threads, blocks, N=10000)
+function gpu_sweep_j(m², ϕ, L, m, R)
+    index = (blockIdx().x - 1) * blockDim().x + threadIdx().x - 1
+    stride = gridDim().x * blockDim().x
+
+    for l in index:stride:L^3÷4-1
+        i = l ÷ L^2
+        j = (l÷L) % L
+        k = l%L
+        
+        x1 = (k%L+1, (4i + 2j + m%2)%L+1, (j + k + m÷2)%L+1)
+        @inbounds x2 = (x1[1], x1[2]%L+1, x1[3])
+
+		r_i = L^3÷4 * (1 + 3(m-1)) + l + 1
+		step(m², ϕ, x1, x2, L, R, r_i)
+    end
+    return
+end
+
+function gpu_sweep_k(m², ϕ, L, m, R)
+    index = (blockIdx().x - 1) * blockDim().x + threadIdx().x - 1
+    stride = gridDim().x * blockDim().x
+
+    for l in index:stride:L^3÷4-1
+        i = l ÷ L^2
+        j = (l÷L) % L
+        k = l%L
+
+        x1 = ((j + k + m÷2)%L+1, k%L+1, (4i + 2j + m%2)%L+1)
+        @inbounds x2 = (x1[1], x1[2], x1[3]%L+1)
+
+		r_i = L^3÷4 * (2 + 3(m-1)) + l + 1
+		step(m², ϕ, x1, x2, L, R, r_i)
+    end
+    return
+end
+
+function thermalize(m², ϕ, threads, blocks, N=10000)
 	R = CUDA.randn(N*3L^3)
 	for i in 1:N
-		sweep(m², ϕ, R[range((i-1)*3L^3+1, length=3L^3)], kernel, threads, blocks)
+		sweep(m², ϕ, R[range((i-1)*3L^3+1, length=3L^3)], threads, blocks)
 	end
 end
 
@@ -95,14 +131,16 @@ N = 1024
 
 R = CUDA.randn(3L^3)
 
-kernel = @cuda launch=false gpu_sweep(m², ϕ, L, 0, 1, R)
-config = launch_configuration(kernel.fun)
+kernel_i = @cuda launch=false gpu_sweep_i(m², ϕ, L, 1, R)
+kernel_j = @cuda launch=false gpu_sweep_j(m², ϕ, L, 1, R)
+kernel_k = @cuda launch=false gpu_sweep_k(m², ϕ, L, 1, R)
+config = launch_configuration(kernel_i.fun)
 threads = min(N, config.threads)
 blocks = cld(N, threads)
 
 maxt = L^2
 
 for i in 0:maxt
-	thermalize(m², ϕ, kernel, threads, blocks, 4*L^2)
+	thermalize(m², ϕ, threads, blocks, 4*L^2)
 	jldsave("/share/tmschaef/jkott/modelB/KZ/IC_crit_L_$L"*"_id_"*ARGS[1]*".jld2", true; ϕ=ϕ, m2=m², i=i)
 end
