@@ -6,7 +6,8 @@ using FFTW
 using JLD2
 using Random
 using CUDA
-using BenchmarkTools
+
+ENV["JULIA_CUDA_USE_BINARYBUILDER"] = false
 
 Random.seed!(parse(Int, ARGS[3]))
 
