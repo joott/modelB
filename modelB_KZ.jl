@@ -2,22 +2,21 @@ cd(@__DIR__)
 
 using Distributions
 using Printf
-using FFTW
 using JLD2
 using Random
 using CUDA
-using BenchmarkTools
+using CUDA.CUFFT
 
-# ENV["JULIA_CUDA_USE_BINARYBUILDER"] = false
+ENV["JULIA_CUDA_USE_BINARYBUILDER"] = false
 
-# Random.seed!(parse(Int, ARGS[3]))
+Random.seed!(parse(Int, ARGS[3]))
+CUDA.seed!(parse(Int, ARGS[3]))
 
-# const L = parse(Int, ARGS[2]) # must be a multiple of 4
-L = 32
+const L = parse(Int, ARGS[2]) # must be a multiple of 4
 const λ = 4.0e0
 const Γ = 1.0e0
 const T = 1.0e0
-const z = 3.9e0
+const z = 3.906e0
 
 const Δt = 0.04e0/Γ
 const Rate = Float64(sqrt(2.0*Δt*Γ))
@@ -161,9 +160,9 @@ for series in 1:16
 
 		thermalize(m²(0), ϕ, threads, blocks, 25*L^2)
 
-		open("/share/tmschaef/jkott/modelB/dynamics_L_$L"*"_id_"*ARGS[1]*"_series_$series"*"_run_$run.dat","w") do io 
+		open("/share/tmschaef/jkott/modelB/KZ/KZ_L_$L"*"_id_"*ARGS[1]*"_series_$series"*"_run_$run.dat","w") do io 
 			for i in 0:maxt
-				ϕk = fft(ϕ)
+				ϕk = Array(fft(ϕ))
 
 				Printf.@printf(io, "%i", skip*i)
 				for kx in 1:L÷2+1
