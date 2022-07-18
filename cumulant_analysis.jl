@@ -33,8 +33,8 @@ function cumulant_run(fn, i)
     df = readdlm(fn, ' ')
     M = df[:,3]
 
-    M4[:,i] .+= M.^4 / (n_files)
-    M2[:,i] .+= M.^2 / (n_files)
+    M4[:,i] .= M.^4
+    M2[:,i] .= M.^2
 end
 
 function collect_files()
