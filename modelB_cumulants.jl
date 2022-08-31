@@ -126,9 +126,11 @@ function gpu_sweep_k(m², ϕ, L, m)
     return
 end
 
+skip = 100
+
 function thermalize(ϕ, t, threads, blocks, N=10000)
 	for i in 0:N-1
-		sweep(m²((i+10*t) * Δt), ϕ, threads, blocks)
+		sweep(m²((i+skip*t) * Δt), ϕ, threads, blocks)
 	end
 end
 
@@ -160,19 +162,19 @@ threads = min(N, config.threads)
 blocks = cld(N, threads)
 
 maxt = trunc(Int, t_e / Δt)+1
-skip = 10
+batch = parse(Int, ARGS[4])
 
 for series in 1:16
 	df = load("/share/tmschaef/jkott/modelB/KZ/IC_sym_L_$L"*"_id_"*ARGS[1]*"_series_$series.jld2")
 
-	for run in 1:16
+	for run in (16batch-63):16batch
 		ϕ .= CuArray(df["ϕ"])
 
-		thermalize_static(m²(0), ϕ, threads, blocks, L^3)
+		thermalize_static(m²(0), ϕ, threads, blocks, 1.5 * 10^4)
 
-		open("/share/tmschaef/jkott/modelB/KZ/cumulants/sum_L_$L"*"_id_"*ARGS[1]*"_series_$series"*"_run_$run.dat","w") do io 
-			for i in 0:div(maxt,skip)+1
-				Printf.@printf(io, "%i %f %f\n", i*skip, m²(10*i * Δt), M(ϕ))
+		open("/share/tmschaef/jkott/modelB/KZ/cumulants/trim/sum_L_$L"*"_id_"*ARGS[1]*"_series_$series"*"_run_$run.dat","w") do io 
+			for i in 0:div(maxt,skip)
+				Printf.@printf(io, "%i %f %f\n", i*skip, m²(skip*i * Δt), M(ϕ))
 				thermalize(ϕ, i, threads, blocks, skip)
 			end
 		end
