@@ -2,14 +2,13 @@ cd(@__DIR__)
 
 using Distributions
 using Printf
-using FFTW
 using JLD2
 using Random
 using CUDA
-
-ENV["JULIA_CUDA_USE_BINARYBUILDER"] = false
+using CUDA.CUFFT
 
 Random.seed!(parse(Int, ARGS[3]))
+CUDA.seed!(parse(Int, ARGS[3]))
 
 const L = parse(Int, ARGS[2]) # must be a multiple of 4
 const λ = 4.0e0
@@ -124,7 +123,7 @@ m² = -2.28587
 ϕ .= ϕ .- shuffle(ϕ)
 ϕ = CuArray(ϕ)
 
-N = 3L^3
+N = div(L^3,4)
 
 kernel_i = @cuda launch=false gpu_sweep_i(m², ϕ, L, 1)
 kernel_j = @cuda launch=false gpu_sweep_j(m², ϕ, L, 1)
@@ -135,7 +134,8 @@ blocks = cld(N, threads)
 
 maxt = L^2
 
+# save initial condition
 for i in 0:maxt
 	thermalize(m², ϕ, threads, blocks, 4*L^2)
-	jldsave("/share/tmschaef/jkott/modelB/KZ/IC_crit_L_$L"*"_id_"*ARGS[1]*".jld2", true; ϕ=ϕ, m2=m², i=i)
+	jldsave("/share/tmschaef/jkott/modelB/KZ/IC_crit_L_$L"*"_id_"*ARGS[1]*".jld2", true; ϕ=Array(ϕ), m2=m², i=i)
 end

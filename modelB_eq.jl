@@ -7,8 +7,6 @@ using Random
 using CUDA
 using CUDA.CUFFT
 
-ENV["JULIA_CUDA_USE_BINARYBUILDER"] = false
-
 Random.seed!(parse(Int, ARGS[3]))
 CUDA.seed!(parse(Int, ARGS[3]))
 
@@ -34,7 +32,7 @@ const t_e = (m²e - m_b)/m_a
 const t_c_steps = trunc(Int, t_c/Δt)
 
 maxt = trunc(Int, t_e / Δt)+1
-ts = [1/2, 3/4, 1, 5/4, 5//2, maxt/t_c_steps] * t_c_steps
+ts = [0, 1/2, 3/4, 1, 5/4, 5/2, maxt/t_c_steps] * t_c
 
 function hotstart(n)
 	rand(ξ, n, n, n)
@@ -134,10 +132,6 @@ function thermalize(m², ϕ, threads, blocks, N=10000)
 	end
 end
 
-m_i = parse(Int, ARGS[4])
-m² = m_a * ts[m_i]*t_c + m_b
-
-println(m²)
 
 ϕ = hotstart(L)
 ϕ .= ϕ .- shuffle(ϕ)
@@ -145,27 +139,27 @@ println(m²)
 
 N = div(L^3,4)
 
-kernel_i = @cuda launch=false gpu_sweep_i(m², ϕ, L, 1)
-kernel_j = @cuda launch=false gpu_sweep_j(m², ϕ, L, 1)
-kernel_k = @cuda launch=false gpu_sweep_k(m², ϕ, L, 1)
+kernel_i = @cuda launch=false gpu_sweep_i(-2.0, ϕ, L, 1)
+kernel_j = @cuda launch=false gpu_sweep_j(-2.0, ϕ, L, 1)
+kernel_k = @cuda launch=false gpu_sweep_k(-2.0, ϕ, L, 1)
 config = launch_configuration(kernel_i.fun)
 threads = min(N, config.threads)
 blocks = cld(N, threads)
 
 id = parse(Int, ARGS[1])
-df = load("/share/tmschaef/jkott/modelB/KZ/IC_crit_L_$L"*"_id_"*ARGS[1]*".jld2")
-if id > 8
-	ϕ = CuArray(df["phi"])
-else
-	ϕ = CuArray(df["ϕ"])
-end
+
+df = load("/share/tmschaef/jkott/modelB/KZ/IC_crit_L_$L"*"_id_$(id).jld2")
+ϕ = CuArray(df["ϕ"])
+
+m_i = parse(Int, ARGS[4])
+m² = m_a * ts[m_i] + m_b
 
 thermalize(m², ϕ, threads, blocks, div(L^4,2))
 
 skip = 10
 
-open("/share/tmschaef/jkott/modelB/KZ/eq/dynamics_L_$(L)_m_$(m_i)"*"_id_"*ARGS[1]*".dat","w") do io
-	for i in 0:L^4
+open("/share/tmschaef/jkott/modelB/KZ/eq/dynamics_L_$(L)_m_$(m_i-1)"*"_id_$(id).dat","w") do io
+	for i in 0:500*div(L^4,skip)
 		ϕk = Array(fft(ϕ))
 
 		Printf.@printf(io, "%i", skip*i)

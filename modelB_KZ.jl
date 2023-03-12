@@ -6,11 +6,11 @@ using JLD2
 using Random
 using CUDA
 using CUDA.CUFFT
-
-ENV["JULIA_CUDA_USE_BINARYBUILDER"] = false
+using CodecZlib
 
 Random.seed!(parse(Int, ARGS[3]))
 CUDA.seed!(parse(Int, ARGS[3]))
+factor = 2^parse(Float32, ARGS[5])
 
 const L = parse(Int, ARGS[2]) # must be a multiple of 4
 const λ = 4.0e0
@@ -23,15 +23,21 @@ const Rate = Float64(sqrt(2.0*Δt*Γ))
 ξ = Normal(0.0e0, 1.0e0)
 
 # KZ protocol variables
-const m²c, m²0, m²e = -2.28587, -2.0e0, -4.0e0
-const m_a, m_b = begin
-    t_c = 0.5 * 10^-3 * L^z * (1 - m²0/m²c)
-    τ_Q = t_c * m²c / (m²c - m²0)
+const m²c, m²0, m²e = -2.28587, -2.0e0, -3.0e0
+m_a, m_b = begin
+	τ_R = 2 * 10^-3 * L^z
+    τ_Q = factor * τ_R
 
     m²c/τ_Q, m²0
 end
 
-const t_e = (m²e - m_b)/m_a
+# In units of time
+t_c = (m²c - m_b) / m_a
+t_e = (m²e - m_b) / m_a
+
+# In units of steps
+maxt = trunc(Int, t_e / Δt)+1
+KZ_t = round(Int, 3/4 * t_c / Δt) # time at which we save Fourier transform
 ##
 
 function hotstart(n)
@@ -126,14 +132,36 @@ function gpu_sweep_k(m², ϕ, L, m)
     return
 end
 
-function thermalize(m², ϕ, threads, blocks, N=10000)
-	for i in 1:N
+skip = 100
+
+function save_fft(ϕ)
+	ϕk = Array(fft(ϕ))
+	open("/share/tmschaef/jkott/modelB/KZ/fft/"*ARGS[5]*"/fft_L_$L"*"_id_"*ARGS[1]*".dat", "a") do io 
+		for kx in 1:L÷2+1
+			Printf.@printf(io, "%f %f", real(ϕk[kx,1,1]), imag(ϕk[kx,1,1]))
+			Printf.@printf(io, kx != L÷2+1 ? " " : "\n")
+		end 
+	end
+end
+
+function thermalize(ϕ, threads, blocks, N=10000)
+	for j in 1:N
+		sweep(m²(j * Δt), ϕ, threads, blocks)
+	end
+end
+
+function thermalize_static(m², ϕ, threads, blocks, N=10000)
+	for i in 0:N-1
 		sweep(m², ϕ, threads, blocks)
 	end
 end
 
 function m²(t)
     m_a*t + m_b
+end
+
+function M(phi)
+	2/L^3*sum(phi[:,:,1:div(L,2)])
 end
 
 ϕ = hotstart(L)
@@ -149,30 +177,18 @@ config = launch_configuration(kernel_i.fun)
 threads = min(N, config.threads)
 blocks = cld(N, threads)
 
-maxt = trunc(Int, t_e / Δt)+1
-skip = 1
+batch = parse(Int, ARGS[4])
+batch_size = 128
 
 for series in 1:16
 	df = load("/share/tmschaef/jkott/modelB/KZ/IC_sym_L_$L"*"_id_"*ARGS[1]*"_series_$series.jld2")
 
-	for run in 1:16
-		ϕ = CuArray(df["ϕ"])
+	for run in batch_size*(batch-1)+1:batch_size*batch
+		ϕ .= CuArray(df["ϕ"])
 
-		thermalize(m²(0), ϕ, threads, blocks, 25*L^2)
+		thermalize_static(m²(0), ϕ, threads, blocks, 1.5 * 10^4)
 
-		open("/share/tmschaef/jkott/modelB/KZ/KZ_L_$L"*"_id_"*ARGS[1]*"_series_$series"*"_run_$run.dat","w") do io 
-			for i in 0:maxt
-				ϕk = Array(fft(ϕ))
-
-				Printf.@printf(io, "%i", skip*i)
-				for kx in 1:L÷2+1
-					Printf.@printf(io, " %f %f", real(ϕk[kx,1,1]), imag(ϕk[kx,1,1]))
-				end 
-
-				Printf.@printf(io,  "\n")
-				flush(io)
-				thermalize(m²(i * Δt), ϕ, threads, blocks, skip)
-			end
-		end
+		thermalize(ϕ, threads, blocks, KZ_t)
+		save_fft(ϕ)
 	end
 end
