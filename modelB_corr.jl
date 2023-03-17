@@ -114,10 +114,8 @@ end
 function CorrFunc(ϕ, L)
 	C = zeros(L÷2+1)
 
-	Threads.@threads for r in 1:(L÷2)+1
-		for i in 1:L, j in 1:L, k in 1:L
-            C[r] = C[r] + ϕ[mod(i+r,L)+1,j,k]*ϕ[i,j,k] + ϕ[i,mod(j+r,L)+1,k]*ϕ[i,j,k] + ϕ[i,j,mod(k+r,L)+1]*ϕ[i,j,k]
-		end
+	for r in 0:(L÷2), i in 1:L, j in 1:L, k in 1:L
+        C[r+1] = C[r+1] + ϕ[mod(i+r-1,L)+1,j,k]*ϕ[i,j,k] + ϕ[i,mod(j+r-1,L)+1,k]*ϕ[i,j,k] + ϕ[i,j,mod(k+r-1,L)+1]*ϕ[i,j,k]
 	end
 	C
 end
