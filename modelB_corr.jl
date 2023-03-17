@@ -23,10 +23,6 @@ const Rate = Float64(sqrt(2.0*Δt*Γ))
 m² = [-1.8, -1.9, -2.0, -2.1, -2.15, -2.2, -2.22, -2.24, -2.26]
 ξ = [3, 3, 3, 4, 5, 7, 8, 11, 22]
 
-function hotstart(n)
-	rand(ξ, n, n, n)
-end
-
 function ΔH(x, ϕ, q, m², L)
 	@inbounds ϕold = ϕ[x...]
 	ϕt = ϕold + q
@@ -132,15 +128,11 @@ function thermalize(m², ϕ, threads, blocks, N=10000)
 	end
 end
 
-function M(phi)
-	2/L^3*sum(phi[:,:,1:div(L,2)])
-end
-
 ϕ = CUDA.zeros(Float64, L, L, L)
 
 N = L^3÷4
 m_id = parse(Int, ARGS[1])
-τ_C = trunc(Int, (2 * 10^-3 * ξ[m_id]^z) / Δt)
+τ_C = trunc(Int, (4 * 10^-3 * ξ[m_id]^z) / Δt)
 n_corr = 50
 
 kernel_i = @cuda launch=false gpu_sweep_i(m²[m_id], ϕ, L, 1)
@@ -150,10 +142,12 @@ config = launch_configuration(kernel_i.fun)
 threads = min(N, config.threads)
 blocks = cld(N, threads)
 
-df = load("IC_sym_L_$L"*"_id_"*ARGS[1]*"_series_1.jld2")
+# df = load("IC_sym_L_$L"*"_id_1_series_$(ARGS[1]).jld2")
+df = load("corr/phi_L_32_m2_$(m_id).jld2") # reuse previous configuration
 ϕ .= CuArray(df["ϕ"])
 
-open("corr/corr_L_$(L)_m2_$(m_id).dat","w") do io 
+open("corr/corr_L_$(L)_m2_$(m_id).dat","a") do io 
+    println("m² id = $(m_id)")
     for i in 1:n_corr
         println(i)
         thermalize(m²[m_id], ϕ, threads, blocks, max(1000, τ_C))
@@ -162,7 +156,7 @@ open("corr/corr_L_$(L)_m2_$(m_id).dat","w") do io
         for x in 1:L÷2+1
             Printf.@printf(io, "%f %f %f\n", x-1, C[x]/(3*L^3), m²[m_id])
         end
-        jldsave("corr/phi_L_$(L)_m2_$(m²[m_id]).jld2", true; ϕ=ϕ, m2=m²)
+        jldsave("corr/phi_L_$(L)_m2_$(m²[m_id]).jld2", true; ϕ=Array(ϕ), m2=m²)
         flush(io)
     end
 end
