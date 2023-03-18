@@ -24,40 +24,40 @@ m² = [-1.8, -1.9, -2.0, -2.1, -2.15, -2.2, -2.22, -2.24, -2.26]
 ξ = [3, 3, 3, 4, 5, 7, 8, 11, 22]
 
 function ΔH(x, ϕ, q, m², L)
-	@inbounds ϕold = ϕ[x...]
-	ϕt = ϕold + q
-	Δϕ = ϕt - ϕold
-	Δϕ² = ϕt^2 - ϕold^2
+    @inbounds ϕold = ϕ[x...]
+    ϕt = ϕold + q
+    Δϕ = ϕt - ϕold
+    Δϕ² = ϕt^2 - ϕold^2
 
     @inbounds ∑nn = ϕ[x[1]%L+1, x[2], x[3]] + ϕ[x[1], x[2]%L+1, x[3]] + ϕ[x[1], x[2], x[3]%L+1] + ϕ[(x[1]+L-2)%L+1, x[2], x[3]] + ϕ[x[1], (x[2]+L-2)%L+1, x[3]] + ϕ[x[1], x[2], (x[3]+L-2)%L+1]
 
-	return 3Δϕ² - Δϕ * ∑nn + 0.5m² * Δϕ² + 0.25λ * (ϕt^4 - ϕold^4)
+    return 3Δϕ² - Δϕ * ∑nn + 0.5m² * Δϕ² + 0.25λ * (ϕt^4 - ϕold^4)
 end
 
 function step(m², ϕ, x1, x2, L)
-	norm = cos(2π*rand())*sqrt(-2*log(rand()))
-	q = Rate*norm
+    norm = cos(2π*rand())*sqrt(-2*log(rand()))
+    q = Rate*norm
 
-	δH = ΔH(x1, ϕ, q, m², L) + ΔH(x2, ϕ, -q, m², L) + q^2
-	P = min(1.0f0, exp(-δH))
-	r = rand()
-	
-	@inbounds ϕ[x1...] += q * (r<P)
-	@inbounds ϕ[x2...] -= q * (r<P)
+    δH = ΔH(x1, ϕ, q, m², L) + ΔH(x2, ϕ, -q, m², L) + q^2
+    P = min(1.0f0, exp(-δH))
+    r = rand()
+
+    @inbounds ϕ[x1...] += q * (r<P)
+    @inbounds ϕ[x2...] -= q * (r<P)
 end
 
 function sweep(m², ϕ, threads, blocks)
-	#=
-	n=0 : (i,j,k)->(x,y,z)
-	n=1 : (i,j,k)->(y,z,x)
-	n=2 : (i,j,k)->(z,x,y)
-	pairs are in i direction
-	=#
-	for m in 1:4
-		kernel_i(m², ϕ, L, m; threads, blocks)
-		kernel_j(m², ϕ, L, m; threads, blocks)
-		kernel_k(m², ϕ, L, m; threads, blocks)
-	end
+    #=
+    n=0 : (i,j,k)->(x,y,z)
+    n=1 : (i,j,k)->(y,z,x)
+    n=2 : (i,j,k)->(z,x,y)
+    pairs are in i direction
+    =#
+    for m in 1:4
+        kernel_i(m², ϕ, L, m; threads, blocks)
+        kernel_j(m², ϕ, L, m; threads, blocks)
+        kernel_k(m², ϕ, L, m; threads, blocks)
+    end
 end
 
 function gpu_sweep_i(m², ϕ, L, m)
@@ -68,11 +68,11 @@ function gpu_sweep_i(m², ϕ, L, m)
         i = l ÷ L^2
         j = (l÷L) % L
         k = l%L
-        
+
         x1 = ((4i + 2j + m%2)%L+1, (j + k + m÷2)%L+1, k%L+1)
         @inbounds x2 = (x1[1]%L+1, x1[2], x1[3])
 
-		step(m², ϕ, x1, x2, L)
+        step(m², ϕ, x1, x2, L)
     end
     return
 end
@@ -85,11 +85,11 @@ function gpu_sweep_j(m², ϕ, L, m)
         i = l ÷ L^2
         j = (l÷L) % L
         k = l%L
-        
+
         x1 = (k%L+1, (4i + 2j + m%2)%L+1, (j + k + m÷2)%L+1)
         @inbounds x2 = (x1[1], x1[2]%L+1, x1[3])
 
-		step(m², ϕ, x1, x2, L)
+        step(m², ϕ, x1, x2, L)
     end
     return
 end
@@ -106,32 +106,34 @@ function gpu_sweep_k(m², ϕ, L, m)
         x1 = ((j + k + m÷2)%L+1, k%L+1, (4i + 2j + m%2)%L+1)
         @inbounds x2 = (x1[1], x1[2], x1[3]%L+1)
 
-		step(m², ϕ, x1, x2, L)
+        step(m², ϕ, x1, x2, L)
     end
     return
 end
 
 function CorrFunc(ϕ, L)
-	C = zeros(L÷2+1)
+    C = zeros(L÷2+1)
 
-	for r in 0:(L÷2), i in 1:L, j in 1:L, k in 1:L
+    for r in 0:(L÷2), i in 1:L, j in 1:L, k in 1:L
         C[r+1] = C[r+1] + ϕ[mod(i+r-1,L)+1,j,k]*ϕ[i,j,k] + ϕ[i,mod(j+r-1,L)+1,k]*ϕ[i,j,k] + ϕ[i,j,mod(k+r-1,L)+1]*ϕ[i,j,k]
-	end
-	C
+    end
+    C
 end
 
 function thermalize(m², ϕ, threads, blocks, N=10000)
-	for i in 0:N-1
-		sweep(m², ϕ, threads, blocks)
-	end
+    for i in 0:N-1
+        sweep(m², ϕ, threads, blocks)
+    end
 end
 
 ϕ = CUDA.zeros(Float64, L, L, L)
 
 N = L^3÷4
 m_id = parse(Int, ARGS[1])
+run = parse(Int, ARGS[4])
 τ_C = trunc(Int, (4 * 10^-3 * ξ[m_id]^z) / Δt)
-n_corr = 100
+skip = 10
+maxt = (100 * max(1000, τ_C)) ÷ skip
 
 kernel_i = @cuda launch=false gpu_sweep_i(m²[m_id], ϕ, L, 1)
 kernel_j = @cuda launch=false gpu_sweep_j(m²[m_id], ϕ, L, 1)
@@ -140,19 +142,20 @@ config = launch_configuration(kernel_i.fun)
 threads = min(N, config.threads)
 blocks = cld(N, threads)
 
-# df = load("IC_sym_L_$L"*"_id_1_series_$(ARGS[1]).jld2")
 df = load("corr/phi_L_32_m2_$(m_id).jld2") # reuse previous configuration
 ϕ .= CuArray(df["ϕ"])
 
-open("corr/corr_L_$(L)_m2_$(m_id).dat","a") do io 
-    for i in 1:n_corr
-        thermalize(m²[m_id], ϕ, threads, blocks, max(1000, τ_C))
-        C = CorrFunc(Array(ϕ), L)
+thermalize(m²[m_id], ϕ, threads, blocks, τ_C)
 
-        for x in 1:L÷2+1
-            Printf.@printf(io, "%f %f %f\n", x-1, C[x]/(3*L^3), m²[m_id])
+open("corr/time_L_$(L)_m2_$(m_id)_run_$run.dat","w") do io 
+    for i in 1:10maxt
+        thermalize(m²[m_id], ϕ, threads, blocks, skip)
+        ϕk = Array(fft(ϕ))
+
+        Printf.@printf(io, "%i %f %f\n", i, real(ϕk[2,1,1]), imag(ϕk[2,1,1]))
+        if i%1000==0
+            jldsave("corr/phi_L_$(L)_m2_$(m_id).jld2", true; ϕ=Array(ϕ), m2=m²[m_id])
         end
-        jldsave("corr/phi_L_$(L)_m2_$(m_id).jld2", true; ϕ=Array(ϕ), m2=m²[m_id])
         flush(io)
     end
 end
