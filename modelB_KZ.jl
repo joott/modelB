@@ -36,8 +36,8 @@ t_c = (m²c - m_b) / m_a
 t_e = (m²e - m_b) / m_a
 
 # In units of steps
-maxt = trunc(Int, t_e / Δt)+1
-KZ_t = round(Int, 3/4 * t_c / Δt) # time at which we save Fourier transform
+const maxt = trunc(Int, t_e / Δt)+1
+const KZ_t = round(Int, 3/4 * t_c / Δt) # time at which we save Fourier transform
 ##
 
 function hotstart(n)
@@ -168,7 +168,7 @@ end
 ϕ .= ϕ .- shuffle(ϕ)
 ϕ = CuArray(ϕ)
 
-N = L^3÷4
+const N = L^3÷4
 
 kernel_i = @cuda launch=false gpu_sweep_i(m²(0), ϕ, L, 1)
 kernel_j = @cuda launch=false gpu_sweep_j(m²(0), ϕ, L, 1)
@@ -177,13 +177,14 @@ config = launch_configuration(kernel_i.fun)
 threads = min(N, config.threads)
 blocks = cld(N, threads)
 
-batch = parse(Int, ARGS[4])
-batch_size = 128
+const batch = parse(Int, ARGS[4])
+const batch_size = 16
+const runs = batch_size*(batch-1)+1:batch_size*batch
 
 for series in 1:16
-	df = load("/share/tmschaef/jkott/modelB/KZ/IC_sym_L_$L"*"_id_"*ARGS[1]*"_series_$series.jld2")
+	df = load("/share/tmschaef/jkott/modelB/KZ/IC_20_L_$L"*"_id_"*ARGS[1]*"_series_$series.jld2")
 
-	for run in batch_size*(batch-1)+1:batch_size*batch
+	for run in runs
 		ϕ .= CuArray(df["ϕ"])
 
 		thermalize_static(m²(0), ϕ, threads, blocks, 1.5 * 10^4)

@@ -7,7 +7,7 @@ const L = 32
 const z = 3.906e0
 const Δt = 0.04e0
 const threads = Threads.nthreads()
-const factor = parse(Int, ARGS[1])
+const factor = 2^parse(Int, ARGS[1])
 
 # KZ protocol variables
 const m²c, m²0, m²e = -2.28587, -2.0e0, -3.0e0
@@ -23,14 +23,13 @@ t_c = (m²c - m_b) / m_a
 t_e = (m²e - m_b) / m_a
 
 # In units of steps
-skip = 100
-maxt = trunc(Int, t_e / Δt) + 1
-maxt = div(maxt, skip) + 1
+const skip = 100
+const maxt = div(trunc(Int, t_e / Δt) + 1, skip) + 1
 ##
 
 id_max = 16
 series_max = 16
-run_max = 128
+run_max = 192
 n_files = id_max * series_max * run_max
 
 M2 = zeros(Float64, maxt, threads)

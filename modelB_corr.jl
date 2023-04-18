@@ -128,10 +128,10 @@ end
 
 ϕ = CUDA.zeros(Float64, L, L, L)
 
-N = L^3÷4
-m_id = parse(Int, ARGS[1])
-τ_C = trunc(Int, (4 * 10^-3 * ξ[m_id]^z) / Δt)
-n_corr = 100
+const N = L^3÷4
+const m_id = parse(Int, ARGS[1])
+const τ_C = trunc(Int, (4 * 10^-3 * ξ[m_id]^z) / Δt)
+const n_corr = 100
 
 kernel_i = @cuda launch=false gpu_sweep_i(m²[m_id], ϕ, L, 1)
 kernel_j = @cuda launch=false gpu_sweep_j(m²[m_id], ϕ, L, 1)
@@ -141,12 +141,12 @@ threads = min(N, config.threads)
 blocks = cld(N, threads)
 
 # df = load("IC_sym_L_$L"*"_id_1_series_$(ARGS[1]).jld2")
-df = load("corr/phi_L_32_m2_$(m_id).jld2") # reuse previous configuration
+df = load("corr/phi_L_$(L)_m2_$(m_id).jld2") # reuse previous configuration
 ϕ .= CuArray(df["ϕ"])
 
 open("corr/corr_L_$(L)_m2_$(m_id).dat","a") do io 
     for i in 1:n_corr
-        thermalize(m²[m_id], ϕ, threads, blocks, max(1000, τ_C))
+        thermalize(m²[m_id], ϕ, threads, blocks, L^4)
         C = CorrFunc(Array(ϕ), L)
 
         for x in 1:L÷2+1

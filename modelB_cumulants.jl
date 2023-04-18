@@ -10,7 +10,7 @@ using CodecZlib
 
 Random.seed!(parse(Int, ARGS[3]))
 CUDA.seed!(parse(Int, ARGS[3]))
-factor = parse(Int, ARGS[5])
+factor = 2^parse(Int, ARGS[5])
 
 const L = parse(Int, ARGS[2]) # must be a multiple of 4
 const λ = 4.0e0
@@ -25,7 +25,7 @@ const Rate = Float64(sqrt(2.0*Δt*Γ))
 # KZ protocol variables
 const m²c, m²0, m²e = -2.28587, -2.0e0, -3.0e0
 m_a, m_b = begin
-	τ_R = 2 * 10^-3 * L^z
+    τ_R = 2 * 10^-3 * L^z
     τ_Q = factor * τ_R
 
     m²c/τ_Q, m²0
@@ -136,7 +136,7 @@ skip = 100
 
 function save_fft(ϕ)
 	ϕk = Array(fft(ϕ))
-	open("/share/tmschaef/jkott/modelB/KZ/fft/$factor"*"/fft_L_$L"*"_id_"*ARGS[1]*".dat", "a") do io 
+	open("/share/tmschaef/jkott/modelB/KZ/fft/"*ARGS[5]*"/fft_L_$L"*"_id_"*ARGS[1]*".dat", "a") do io 
 		for kx in 1:L÷2+1
 			Printf.@printf(io, "%f %f", real(ϕk[kx,1,1]), imag(ϕk[kx,1,1]))
 			if kx != L÷2+1
@@ -175,7 +175,7 @@ end
 ϕ .= ϕ .- shuffle(ϕ)
 ϕ = CuArray(ϕ)
 
-N = L^3÷4
+const N = L^3÷4
 
 kernel_i = @cuda launch=false gpu_sweep_i(m²(0), ϕ, L, 1)
 kernel_j = @cuda launch=false gpu_sweep_j(m²(0), ϕ, L, 1)
@@ -184,18 +184,19 @@ config = launch_configuration(kernel_i.fun)
 threads = min(N, config.threads)
 blocks = cld(N, threads)
 
-batch = parse(Int, ARGS[4])
-batch_size = 32
+const batch = parse(Int, ARGS[4])
+const batch_size = 16
+const runs = batch_size*(batch-1)+1:batch_size*batch
 
 for series in 1:16
 	df = load("/share/tmschaef/jkott/modelB/KZ/IC_sym_L_$L"*"_id_"*ARGS[1]*"_series_$series.jld2")
 
-	for run in batch_size*(batch-1)+1:batch_size*batch
+	for run in runs
 		ϕ .= CuArray(df["ϕ"])
 
 		thermalize_static(m²(0), ϕ, threads, blocks, 1.5 * 10^4)
 
-		open("/share/tmschaef/jkott/modelB/KZ/cumulants/$factor"*"/sum_L_$L"*"_id_"*ARGS[1]*"_series_$series"*"_run_$run.dat","w") do io 
+		open("/share/tmschaef/jkott/modelB/KZ/cumulants/"*ARGS[5]*"/sum_L_$L"*"_id_"*ARGS[1]*"_series_$series"*"_run_$run.dat","w") do io 
 			for i in 0:div(maxt,skip)
 				Printf.@printf(io, "%i %f %f\n", i*skip, m²(skip*i * Δt), M(ϕ))
 				thermalize(ϕ, i, threads, blocks, skip)

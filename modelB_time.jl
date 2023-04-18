@@ -128,12 +128,13 @@ end
 
 ϕ = CUDA.zeros(Float64, L, L, L)
 
-N = L^3÷4
-m_id = parse(Int, ARGS[1])
-run = parse(Int, ARGS[4])
-τ_C = trunc(Int, (4 * 10^-3 * ξ[m_id]^z) / Δt)
-skip = 10
-maxt = (100 * max(1000, τ_C)) ÷ skip
+const N = L^3÷4
+const m_id = parse(Int, ARGS[1])
+#run = parse(Int, ARGS[4])
+const τ_C = trunc(Int, (4 * 10^-3 * ξ[m_id]^z) / Δt)
+const skip = 10
+#maxt = (100 * max(5000, τ_C)) ÷ skip
+const maxt = (2000000) ÷ skip
 
 kernel_i = @cuda launch=false gpu_sweep_i(m²[m_id], ϕ, L, 1)
 kernel_j = @cuda launch=false gpu_sweep_j(m²[m_id], ϕ, L, 1)
@@ -142,20 +143,27 @@ config = launch_configuration(kernel_i.fun)
 threads = min(N, config.threads)
 blocks = cld(N, threads)
 
-df = load("corr/phi_L_32_m2_$(m_id).jld2") # reuse previous configuration
+#df = load("IC_20_L_16_id_$(m_id).jld2")
+df = load("corr/phi_L_16_m2_$(m_id).jld2") # reuse previous configuration
 ϕ .= CuArray(df["ϕ"])
 
-thermalize(m²[m_id], ϕ, threads, blocks, τ_C)
-
-open("corr/time_L_$(L)_m2_$(m_id)_run_$run.dat","w") do io 
-    for i in 1:10maxt
-        thermalize(m²[m_id], ϕ, threads, blocks, skip)
-        ϕk = Array(fft(ϕ))
-
-        Printf.@printf(io, "%i %f %f\n", i, real(ϕk[2,1,1]), imag(ϕk[2,1,1]))
-        if i%1000==0
-            jldsave("corr/phi_L_$(L)_m2_$(m_id).jld2", true; ϕ=Array(ϕ), m2=m²[m_id])
-        end
-        flush(io)
-    end
+for run in 1:16
+	thermalize(m²[m_id], ϕ, threads, blocks, 10*maxt)
+	
+	open("corr/time_L_$(L)_m2_$(m_id)_run_$run.dat","w") do io 
+	    for i in 0:maxt-1
+	        thermalize(m²[m_id], ϕ, threads, blocks, skip)
+	        ϕk = Array(fft(ϕ))
+	
+		Printf.@printf(io, "%i ", skip*i)
+		for k in 1:5
+	        	Printf.@printf(io, "%f %f ", real(ϕk[k,1,1]), imag(ϕk[k,1,1]))
+		end
+		Printf.@printf(io, "\n")
+	        if i%100==0
+	            jldsave("corr/phi_L_$(L)_m2_$(m_id).jld2", true; ϕ=Array(ϕ), m2=m²[m_id])
+	        end
+	        flush(io)
+	    end
+	end
 end

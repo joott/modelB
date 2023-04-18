@@ -6,7 +6,7 @@ using Statistics
 const L = 32
 const id_max = 16
 const series_max = 16
-const run_max = 128
+const run_max = 64
 const id_size = series_max*run_max
 const n_quenches = id_max*id_size
 

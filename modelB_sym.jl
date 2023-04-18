@@ -6,9 +6,6 @@ using FFTW
 using JLD2
 using Random
 using CUDA
-using BenchmarkTools
-
-ENV["JULIA_CUDA_USE_BINARYBUILDER"] = false
 
 Random.seed!(parse(Int, ARGS[3]))
 
@@ -120,15 +117,14 @@ function thermalize(m², ϕ, threads, blocks, N=10000)
 	end
 end
 
-df = load("/share/tmschaef/jkott/modelB/KZ/IC_crit_L_$L"*"_id_"*ARGS[1]*".jld2")
 
 ϕ = hotstart(L)
 ϕ .= ϕ .- shuffle(ϕ)
 ϕ = CuArray(ϕ)
 
-m² = -2.0e0
+const m² = -3.0e0
 
-N = L^3÷4
+const N = L^3÷4
 
 kernel_i = @cuda launch=false gpu_sweep_i(m², ϕ, L, 1)
 kernel_j = @cuda launch=false gpu_sweep_j(m², ϕ, L, 1)
@@ -137,12 +133,17 @@ config = launch_configuration(kernel_i.fun)
 threads = min(N, config.threads)
 blocks = cld(N, threads)
 
-maxt = 30
 
 for series in 1:16
+	df = load("/share/tmschaef/jkott/modelB/KZ/IC_30_L_$L"*"_id_"*ARGS[1]*"_series_1.jld2")
+	
 	@show series
-	ϕ = CuArray(df["ϕ"])
+	ϕ .= CuArray(df["ϕ"])
 
-	thermalize(m², ϕ, threads, blocks, maxt*L^2)
-	jldsave("/share/tmschaef/jkott/modelB/KZ/IC_sym_L_$L"*"_id_"*ARGS[1]*"_series_$series.jld2", true; ϕ=Array(ϕ), m2=m²)
+	i = df["i"]
+	while (true)
+		i += 1
+		thermalize(m², ϕ, threads, blocks, div(L^4,5))
+		jldsave("/share/tmschaef/jkott/modelB/KZ/IC_30_L_$L"*"_id_"*ARGS[1]*"_series_$series.jld2", true; ϕ=Array(ϕ), m2=m², i=i)
+	end
 end
