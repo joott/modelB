@@ -130,13 +130,12 @@ config = launch_configuration(kernel_i.fun)
 threads = min(N, config.threads)
 blocks = cld(N, threads)
 
-thermalize(m², ϕ, threads, blocks, L^4÷4)
-
 const skip=10 
 
-open("/share/tmschaef/jkott/modelB/dynamics_28_L_$L"*"_id_"*ARGS[1]*".dat","w") do io 
-	i = 0
-	while true
+for series in 33:48
+thermalize(m², ϕ, threads, blocks, L^4)
+open("/share/tmschaef/jkott/modelB/dynamics_L_$L"*"_id_"*ARGS[1]*"_series_$(series).dat","w") do io 
+	for i in 0:L^4
 		ϕk = Array(fft(ϕ))
 
 		Printf.@printf(io, "%i", skip*i)
@@ -148,6 +147,6 @@ open("/share/tmschaef/jkott/modelB/dynamics_28_L_$L"*"_id_"*ARGS[1]*".dat","w") 
 		Printf.@printf(io,  "\n")
 		flush(io)
 		thermalize(m², ϕ, threads, blocks, skip)
-		i += 1
 	end
+end
 end
